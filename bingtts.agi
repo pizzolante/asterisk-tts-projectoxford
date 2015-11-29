@@ -1,0 +1,69 @@
+#!/usr/bin/php -q
+<?php
+
+require_once "phpagi.php";
+$agi = new AGI();
+$testo = $argv[1];
+
+$filename = md5(uniqid(rand(), true));
+$ext = ".ulaw";
+$pathTmp = "/tmp/";
+
+$AccessTokenUri =   "https://oxford-speech.cloudapp.net:443/token/issueToken";
+
+$clientId = "LA TUA PRIMARY KEY";
+$clientSecret =   "LA TUA SECONDARY KEY";
+
+$ttsHost =   "https://speech.platform.bing.com";
+$data =   array('grant_type' => 'client_credentials', 'client_id' => $clientId,
+  'client_secret'   => $clientSecret, 'scope' => $ttsHost);
+$data =   http_build_query($data);
+
+$options = array(
+  'http' => array(
+    'header'  => "Content-type:   application/x-www-form-urlencoded\r\n" .
+    "content-length:   ".strlen($data)."\r\n",
+    'method'  => 'POST',
+    'content' => $data,
+    ),
+  );
+$context  = stream_context_create($options);
+
+$result =   file_get_contents($AccessTokenUri, false, $context);
+if (!$result) {
+  throw new Exception("Problem with   $AccessTokenUri, $php_errormsg");
+}
+else{
+
+  $OxfordAcessToken = json_decode($result);
+  $access_token =   $OxfordAcessToken->{'access_token'};
+  $ttsServiceUri =   "https://speech.platform.bing.com:443/synthesize";
+
+  $data = "<speak version='1.0'   xml:lang='it-IT'><voice name='Microsoft Server Speech Text to Speech Voice (it-IT, Cosimo, Apollo)'>".$testo."</voice></speak>";
+
+  $options = array(
+    'http' => array(
+      'header'  => "Content-type:   application/ssml+xml\r\n" .
+      "X-Microsoft-OutputFormat:   raw-8khz-8bit-mono-mulaw\r\n" .
+      "Authorization:   "."Bearer ".$access_token."\r\n" .
+      "X-Search-AppId:   07D3234E49CE426DAA29772419F436CA\r\n" .
+      "X-Search-ClientID:   1ECFAE91408841A480F00935DC390960\r\n" .
+      "User-Agent:   TTSPHP\r\n" .
+      "content-length:   ".strlen($data)."\r\n",
+      'method'  => 'POST',
+      'content' => $data,
+      ),
+    );
+  $context    = stream_context_create($options);
+
+  $result =   file_get_contents($ttsServiceUri, false, $context);
+  if (!$result) {
+    throw new Exception("Problem   with $AccessTokenUri, $php_errormsg");
+  }
+  else{ 
+
+    file_put_contents($pathTmp.$filename.$ext,$result);
+    $agi->exec('Playback',$pathTmp.$filename);
+  }
+}
+?>
